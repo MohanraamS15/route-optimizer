@@ -8,6 +8,7 @@ def solve_route(
     depot,
     demands,
     vehicle_capacities,
+    time_windows,
 ):
 
     manager = pywrapcp.RoutingIndexManager(
@@ -49,6 +50,39 @@ def solve_route(
         vehicle_capacities,
         True,
         "Capacity",
+    )
+    
+    # ------------------------
+    # Time Dimension
+    # ------------------------
+
+    routing.AddDimension(
+        transit_callback,
+        30,
+        3000,
+        False,
+        "Time",
+    )
+
+    time_dimension = routing.GetDimensionOrDie("Time")
+
+    for location_idx, time_window in enumerate(time_windows):
+
+        if location_idx == depot:
+            continue
+
+        index = manager.NodeToIndex(location_idx)
+
+        time_dimension.CumulVar(index).SetRange(
+            time_window[0],
+            time_window[1],
+        )
+
+    depot_index = manager.NodeToIndex(depot)
+
+    time_dimension.CumulVar(depot_index).SetRange(
+        time_windows[depot][0],
+        time_windows[depot][1],
     )
 
     # Search Parameters

@@ -7,3 +7,4 @@ class OptimizeRequest(BaseModel):
     depot:int
     demands:list[int]
     vehicle_capacities:list[int]
+    time_windows: list[list[int]]
