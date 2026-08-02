@@ -1,59 +1,16 @@
 import time
 
 from fastapi import FastAPI
-
+from fastapi import HTTPException
 from osrm.service import get_matrix
 from optimizer.solver import solve_route
 from models.request import OptimizeRequest
+from models.response import OptimizeResponse
+from validators.request_validator import validate_request
+from utils.response_builder import build_response
 
 app = FastAPI()
 
-
-def build_response(
-    routes,
-    demands,
-    distance_matrix,
-    time_matrix,
-):
-    response_routes = []
-
-    total_distance = 0
-    total_duration = 0
-
-    for vehicle_id, route in enumerate(routes):
-
-        load = 0
-        distance = 0
-        duration = 0
-
-        for i in range(len(route) - 1):
-
-            from_node = route[i]
-            to_node = route[i + 1]
-
-            distance += distance_matrix[from_node][to_node]
-            duration += time_matrix[from_node][to_node]
-
-            load += demands[to_node]
-
-        response_routes.append(
-            {
-                "vehicle_id": vehicle_id,
-                "route": route,
-                "load": load,
-                "distance": round(distance, 2),
-                "duration": round(duration, 2),
-            }
-        )
-
-        total_distance += distance
-        total_duration += duration
-
-    return {
-        "routes": response_routes,
-        "total_distance": round(total_distance, 2),
-        "total_duration": round(total_duration, 2),
-    }
 
 
 @app.get("/")
@@ -61,8 +18,10 @@ def home():
     return {"message": "Optimization Service Running 🚀"}
 
 
-@app.post("/optimize")
+@app.post("/optimize",response_model=OptimizeResponse)  
 def optimize(request: OptimizeRequest):
+
+    validate_request(request)
 
     coordinates = request.coordinates
 
@@ -76,6 +35,12 @@ def optimize(request: OptimizeRequest):
         vehicle_capacities=request.vehicle_capacities,
         time_windows=request.time_windows,
     )
+    
+    if routes is None:
+        raise HTTPException(
+            status_code=400,
+            detail="No feasible route found for the given constraints."
+        )
 
     return build_response(
         routes,
