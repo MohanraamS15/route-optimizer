@@ -1,17 +1,39 @@
+from fastapi import FastAPI
+
 from osrm.service import get_matrix
 from optimizer.solver import solve_route
+from models.request import OptimizeRequest
 
 
-coordinates = [
-    (80.2337, 13.0418),
-    (80.2707, 13.0827),
-    (80.2500, 13.0600),
-]
+app = FastAPI()
 
 
-time_matrix, distance_matrix = get_matrix(coordinates)
+@app.get("/")
+def home():
+    return {
+        "message": "Optimization Service Running 🚀"
+    }
 
-route = solve_route(time_matrix)
 
-print("Optimized Route")
-print(route)
+@app.post("/optimize")
+def optimize(request: OptimizeRequest):
+
+    coordinates = request.coordinates
+
+    time_matrix, distance_matrix = get_matrix(
+        coordinates
+    )
+
+    routes = solve_route(
+        time_matrix,
+        request.num_vehicles,
+        request.depot,
+        request.demands,
+        request.vehicle_capacities
+    )
+
+    return {
+        "routes": routes,
+        "time_matrix": time_matrix,
+        "distance_matrix": distance_matrix,
+    }
