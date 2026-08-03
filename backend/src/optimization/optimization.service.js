@@ -1,11 +1,11 @@
 import prisma from "../config/prisma.js";
+import { optimize } from "../utils/optimizerClient.js";
 
 export const createJob = async (userId, data) => {
   const job = await prisma.optimizationJob.create({
     data: {
       jobName: data.jobName,
       vehicleCount: data.vehicleCount,
-      depotIndex: null,
       status: "DRAFT",
       userId: userId,
     },
@@ -83,17 +83,21 @@ export const updateJob = async (jobId, userId, data) => {
     throw new Error("Unauthorized to access this job");
   }
 
-  if (data.depotIndex !== undefined && data.depotIndex !== null) {
+  if (data.startIndex !== undefined || data.endIndex !== undefined) {
     const locationCount = await prisma.location.count({
       where: { jobId: jobId },
     });
 
     if (locationCount === 0) {
-      throw new Error("Cannot set depotIndex because no locations exist yet");
+      throw new Error("Cannot set start/end location because no locations exist yet");
     }
-    
-    if (data.depotIndex < 0 || data.depotIndex >= locationCount) {
-      throw new Error("Invalid depotIndex");
+
+    if (data.startIndex !== undefined && (data.startIndex < 0 || data.startIndex >= locationCount)) {
+      throw new Error("Invalid startIndex");
+    }
+
+    if (data.endIndex !== undefined && (data.endIndex < 0 || data.endIndex >= locationCount)) {
+      throw new Error("Invalid endIndex");
     }
   }
 
@@ -103,4 +107,85 @@ export const updateJob = async (jobId, userId, data) => {
   });
 
   return updatedJob;
+};
+
+export const optimizeJob = async (jobId, userId) => {
+  // ------------------------
+  // Verify Job
+  // ------------------------
+
+  const job = await prisma.optimizationJob.findUnique({
+    where: {
+      id: jobId,
+    },
+  });
+
+  if (!job) {
+    throw new Error("Job not found");
+  }
+
+  if (job.userId !== userId) {
+    throw new Error("Unauthorized to access this job");
+  }
+
+  // ------------------------
+  // Validate Start & End
+  // ------------------------
+
+  if (
+    job.startIndex === null ||
+    job.endIndex === null
+  ) {
+    throw new Error("Start and end locations must be selected before optimization.");
+  }
+
+  // ------------------------
+  // Fetch Locations
+  // ------------------------
+
+  const locations = await prisma.location.findMany({
+    where: {
+      jobId: jobId,
+    },
+    orderBy: {
+      id: "asc",
+    },
+  });
+
+  if (locations.length < 2) {
+    throw new Error("At least two locations are required for optimization.");
+  }
+
+  // ------------------------
+  // Build FastAPI Payload
+  // ------------------------
+
+  const payload = {
+    coordinates: locations.map((location) => [
+      location.longitude,
+      location.latitude,
+    ]),
+
+    num_vehicles: job.vehicleCount,
+
+    start_index: job.startIndex,
+
+    end_index: job.endIndex,
+
+    demands: locations.map((location) => location.demand ?? 0),
+
+    // Temporary default capacity
+    vehicle_capacities: Array(job.vehicleCount).fill(100),
+
+    // Temporary default time windows (86400 seconds = 24 hours)
+    time_windows: locations.map(() => [0, 86400]),
+  };
+
+  // ------------------------
+  // Call FastAPI
+  // ------------------------
+
+  const result = await optimize(payload);
+
+  return result;
 };

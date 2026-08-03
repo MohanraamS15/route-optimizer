@@ -69,7 +69,7 @@ def solve_route(
     routing.AddDimension(
         transit_callback,
         30,
-        3000,
+        86400,
         False,
         "Time",
     )

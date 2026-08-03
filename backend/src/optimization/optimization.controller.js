@@ -4,6 +4,7 @@ import {
   getJobById,
   deleteJob,
   updateJob,
+  optimizeJob,
 } from "./optimization.service.js";
 import {
   createOptimizationJobSchema,
@@ -154,6 +155,59 @@ export const update = async (req, res) => {
       error.message === "Invalid endIndex" ||
       error.message ===
         "Cannot set start/end location because no locations exist yet"
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+export const optimize = async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id, 10);
+    const userId = req.user.id;
+
+    if (isNaN(jobId)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid job ID format",
+      });
+    }
+
+    const result = await optimizeJob(jobId, userId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Optimization completed successfully",
+      result,
+    });
+
+  } catch (error) {
+
+    if (error.message === "Job not found") {
+      return res.status(404).json({
+        success: false,
+        error: error.message,
+      });
+    }
+
+    if (error.message === "Unauthorized to access this job") {
+      return res.status(403).json({
+        success: false,
+        error: error.message,
+      });
+    }
+
+    if (
+      error.message === "Start and end locations must be selected before optimization." ||
+      error.message === "At least two locations are required for optimization."
     ) {
       return res.status(400).json({
         success: false,
