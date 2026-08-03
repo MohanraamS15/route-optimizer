@@ -2,6 +2,18 @@ import prisma from "../config/prisma.js";
 import { optimize } from "../utils/optimizerClient.js";
 
 export const createJob = async (userId, data) => {
+  const vehiclesData = [];
+  const count = data.routeType === "TRIP_PLANNER" ? 1 : (data.vehicleCount || 1);
+  
+  if (count > 0) {
+    for (let i = 1; i <= count; i++) {
+      vehiclesData.push({
+        name: `Vehicle ${i}`,
+        capacity: 100
+      });
+    }
+  }
+
   const job = await prisma.optimizationJob.create({
     data: {
       jobName: data.jobName,
@@ -9,6 +21,9 @@ export const createJob = async (userId, data) => {
       vehicleCount: data.vehicleCount,
       status: "DRAFT",
       userId: userId,
+      vehicles: {
+        create: vehiclesData
+      }
     },
   });
 
@@ -33,6 +48,11 @@ export const getJobById = async (jobId, userId) => {
     where: {
       id: jobId,
     },
+    include: {
+      vehicles: {
+        orderBy: { id: "asc" }
+      }
+    }
   });
 
   if (!job) {
@@ -110,6 +130,41 @@ export const updateJob = async (jobId, userId, data) => {
   return updatedJob;
 };
 
+export const updateVehicles = async (jobId, userId, vehiclesData) => {
+  const job = await prisma.optimizationJob.findUnique({
+    where: { id: jobId },
+  });
+
+  if (!job) {
+    throw new Error("Job not found");
+  }
+
+  if (job.userId !== userId) {
+    throw new Error("Unauthorized to access this job");
+  }
+
+  // Ensure all vehicles actually belong to this job (security)
+  const existingVehicles = await prisma.vehicle.findMany({
+    where: { jobId: jobId },
+  });
+  
+  const validVehicleIds = existingVehicles.map(v => v.id);
+
+  // Update in a transaction
+  const updates = vehiclesData.filter(v => validVehicleIds.includes(v.id)).map((vehicle) => {
+    return prisma.vehicle.update({
+      where: { id: vehicle.id },
+      data: {
+        name: vehicle.name,
+        capacity: vehicle.capacity,
+      },
+    });
+  });
+
+  await prisma.$transaction(updates);
+  return { success: true };
+};
+
 export const optimizeJob = async (jobId, userId) => {
   // ------------------------
   // Verify Job
@@ -119,6 +174,11 @@ export const optimizeJob = async (jobId, userId) => {
     where: {
       id: jobId,
     },
+    include: {
+      vehicles: {
+        orderBy: { id: "asc" }
+      }
+    }
   });
 
   if (!job) {
@@ -162,7 +222,14 @@ export const optimizeJob = async (jobId, userId) => {
   // ------------------------
 
   const isTripPlanner = job.routeType === "TRIP_PLANNER";
-  const numVehicles = isTripPlanner ? 1 : job.vehicleCount;
+
+  let vehicleCapacities = [];
+  if (job.vehicles && job.vehicles.length > 0) {
+    vehicleCapacities = job.vehicles.map(v => isTripPlanner ? 1000000 : v.capacity);
+  } else {
+    const numVehicles = isTripPlanner ? 1 : job.vehicleCount;
+    vehicleCapacities = Array(numVehicles).fill(isTripPlanner ? 1000000 : 100);
+  }
 
   const payload = {
     coordinates: locations.map((location) => [
@@ -170,7 +237,7 @@ export const optimizeJob = async (jobId, userId) => {
       location.latitude,
     ]),
 
-    num_vehicles: numVehicles,
+    num_vehicles: vehicleCapacities.length,
 
     start_index: job.startIndex,
 
@@ -178,8 +245,7 @@ export const optimizeJob = async (jobId, userId) => {
 
     demands: locations.map((location) => (isTripPlanner ? 0 : (location.demand ?? 0))),
 
-    // Default capacity: Unlimited for trip planner, 100 for delivery
-    vehicle_capacities: Array(numVehicles).fill(isTripPlanner ? 1000000 : 100),
+    vehicle_capacities: vehicleCapacities,
 
     // Time windows from DB, default to whole day (0 -> 86400)
     time_windows: locations.map((loc) => [
@@ -193,6 +259,7 @@ export const optimizeJob = async (jobId, userId) => {
   // ------------------------
 
   const result = await optimize(payload);
+  console.log("Python Backend Response for first route:", JSON.stringify(result.routes[0], null, 2));
 
   // ------------------------
   // Persist Routes in DB
@@ -216,12 +283,14 @@ export const optimizeJob = async (jobId, userId) => {
     });
 
     // Create RouteStop records
-    const routeStopsData = routeData.route.map((locationIndex, sequence) => {
-      const locationId = locations[locationIndex].id;
+    const stopsArray = routeData.stops || routeData.route.map(nodeIdx => ({ location_index: nodeIdx, distance_from_previous: null }));
+    const routeStopsData = stopsArray.map((stop, sequence) => {
+      const locationId = locations[stop.location_index].id;
       return {
         sequence: sequence,
         routeId: newRoute.id,
         locationId: locationId,
+        distanceFromPrevious: stop.distance_from_previous,
         arrivalTime: null,
       };
     });
@@ -291,6 +360,7 @@ export const getOptimizationResult = async (jobId, userId) => {
         latitude: stop.location.latitude,
         longitude: stop.location.longitude,
         demand: stop.location.demand ?? 0,
+        distanceFromPreviousKm: stop.distanceFromPrevious ? Number((stop.distanceFromPrevious / 1000).toFixed(2)) : 0,
       })),
     };
   });

@@ -33,7 +33,19 @@ export default function CreateJobForm({ onJobCreated }) {
       setRouteType("DELIVERY");
       setVehicleCount(1);
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to create job");
+      const errorData = err.response?.data?.error;
+      
+      if (Array.isArray(errorData) && errorData.length > 0) {
+        setError(errorData[0].message);
+      } else if (errorData && typeof errorData === 'object') {
+        if (errorData.issues && errorData.issues.length > 0) {
+          setError(errorData.issues[0].message);
+        } else {
+          setError(errorData.message || JSON.stringify(errorData));
+        }
+      } else {
+        setError(errorData || "Failed to create job");
+      }
     }
   };
 

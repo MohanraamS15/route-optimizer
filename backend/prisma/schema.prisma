@@ -54,6 +54,7 @@ model OptimizationJob {
 
   locations     Location[]
   routes        Route[]
+  vehicles      Vehicle[]
 }
 
 model Location {
@@ -104,10 +105,21 @@ model RouteStop {
   sequence      Int
 
   arrivalTime   Int?
+  distanceFromPrevious Float?
 
   routeId       Int
   route         Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
 
   locationId    Int
   location      Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+}
+
+model Vehicle {
+  id        Int    @id @default(autoincrement())
+
+  name      String
+  capacity  Int
+
+  jobId     Int
+  job       OptimizationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
 }

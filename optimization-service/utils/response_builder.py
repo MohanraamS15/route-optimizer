@@ -15,6 +15,18 @@ def build_response(
         load = 0
         distance = 0
         duration = 0
+        
+        stops = []
+        for i, node in enumerate(route):
+            if i == 0:
+                dist_prev = 0
+            else:
+                dist_prev = distance_matrix[route[i-1]][node]
+            
+            stops.append({
+                "location_index": node,
+                "distance_from_previous": round(dist_prev, 2)
+            })
 
         for i in range(len(route) - 1):
 
@@ -30,6 +42,7 @@ def build_response(
             {
                 "vehicle_id": vehicle_id,
                 "route": route,
+                "stops": stops,
                 "load": load,
                 "distance": round(distance, 2),
                 "duration": round(duration, 2),

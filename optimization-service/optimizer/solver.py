@@ -74,6 +74,14 @@ def solve_route(
         "Time",
     )
 
+    # Allow dropping nodes with a penalty so it never fails completely
+    # Penalty should be large enough that it only drops if absolutely necessary
+    penalty = 10000000
+    for node in range(len(time_matrix)):
+        if node == start_index or node == end_index:
+            continue
+        routing.AddDisjunction([manager.NodeToIndex(node)], penalty)
+
     time_dimension = routing.GetDimensionOrDie("Time")
 
     # Apply time windows to all customer locations
@@ -108,8 +116,14 @@ def solve_route(
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
 
     search_parameters.first_solution_strategy = (
-        routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
+        routing_enums_pb2.FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION
     )
+    
+    # Enable Guided Local Search to escape local minima
+    search_parameters.local_search_metaheuristic = (
+        routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
+    )
+    search_parameters.time_limit.FromSeconds(2) # 2 seconds time limit for local search
 
     print("Before Solve")
 

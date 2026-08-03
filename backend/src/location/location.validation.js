@@ -13,7 +13,7 @@ export const createLocationsSchema = z.object({
 
 export const updateLocationSchema = z.object({
   address: z.string().min(1, "Address cannot be empty if provided").optional(),
-  demand: z.number().int().nonnegative("Demand must be a non-negative integer").optional(),
-  timeWindowStart: z.number().int().nonnegative().optional(),
-  timeWindowEnd: z.number().int().positive().optional(),
+  demand: z.number().int().nonnegative("Demand must be a non-negative integer").optional().nullable(),
+  timeWindowStart: z.number().int().nonnegative().optional().nullable(),
+  timeWindowEnd: z.number().int().positive().optional().nullable(),
 });
