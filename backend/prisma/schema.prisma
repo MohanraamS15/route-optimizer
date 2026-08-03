@@ -31,67 +31,74 @@ model OptimizationJob {
   id            Int                 @id @default(autoincrement())
 
   jobName       String
-  status        OptimizationStatus  @default(DRAFT)
 
   vehicleCount  Int
-  depotIndex    Int?
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  startIndex    Int?
+  endIndex      Int?
+
+  status        OptimizationStatus  @default(DRAFT)
+
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
   userId        Int
-  user          User @relation(fields: [userId], references: [id])
+  user          User                @relation(fields: [userId], references: [id])
 
   locations     Location[]
   routes        Route[]
 }
 
 model Location {
-  id              Int     @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
 
-  address         String
+  address     String
 
-  latitude        Float
-  longitude       Float
+  latitude    Float
+  longitude   Float
 
-  demand          Int
+  demand      Int?
 
-  timeWindowStart Int
-  timeWindowEnd   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  jobId           Int
-  job             OptimizationJob @relation(fields: [jobId], references: [id])
+  jobId       Int
+  job         OptimizationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
-  routeStops      RouteStop[]
+  routeStops  RouteStop[]
 }
+
+
 
 model Route {
-  id              Int     @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
 
-  vehicleIndex    Int
+  vehicleIndex   Int
 
-  totalDistance   Float
+  totalDistance  Float
+  totalDuration  Float
 
-  totalDuration   Float
+  totalLoad      Int
 
-  totalLoad       Int
+  createdAt      DateTime @default(now())
 
-  jobId           Int
-  job             OptimizationJob @relation(fields: [jobId], references: [id])
+  jobId          Int
+  job            OptimizationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
-  routeStops      RouteStop[]
+  stops          RouteStop[]
 }
 
+
 model RouteStop {
-  id          Int @id @default(autoincrement())
+  id            Int @id @default(autoincrement())
 
-  sequence    Int
+  sequence      Int
 
-  arrivalTime Int?
+  arrivalTime   Int?
 
-  routeId     Int
-  route       Route @relation(fields: [routeId], references: [id])
+  routeId       Int
+  route         Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
 
-  locationId  Int
-  location    Location @relation(fields: [locationId], references: [id])
+  locationId    Int
+  location      Location @relation(fields: [locationId], references: [id])
 }
