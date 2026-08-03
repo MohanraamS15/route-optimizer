@@ -15,4 +15,14 @@ __pycache__/
 .pytest_cache/
 
 # macOS
-.DS_Storegit 
+.DS_Store
+
+# Backend (Node.js)
+backend/node_modules/
+backend/npm-debug.log*
+backend/yarn-debug.log*
+backend/yarn-error.log*
+backend/pnpm-debug.log*
+backend/logs/
+backend/*.log
+backend/src/generated/prisma

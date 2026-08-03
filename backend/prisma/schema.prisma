@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OptimizationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  optimizationJobs OptimizationJob[]
+}
+
+model OptimizationJob {
+  id           Int                 @id @default(autoincrement())
+  status       OptimizationStatus  @default(PENDING)
+
+  vehicleCount Int
+  depotIndex   Int
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  userId       Int?
+  user         User? @relation(fields: [userId], references: [id])
+
+  locations    Location[]
+  routes       Route[]
+}
+
+model Location {
+  id              Int     @id @default(autoincrement())
+
+  address         String
+
+  latitude        Float
+  longitude       Float
+
+  demand          Int
+
+  timeWindowStart Int
+  timeWindowEnd   Int
+
+  jobId           Int
+  job             OptimizationJob @relation(fields: [jobId], references: [id])
+
+  routeStops      RouteStop[]
+}
+
+model Route {
+  id              Int     @id @default(autoincrement())
+
+  vehicleIndex    Int
+
+  totalDistance   Float
+
+  totalDuration   Float
+
+  totalLoad       Int
+
+  jobId           Int
+  job             OptimizationJob @relation(fields: [jobId], references: [id])
+
+  routeStops      RouteStop[]
+}
+
+model RouteStop {
+  id          Int @id @default(autoincrement())
+
+  sequence    Int
+
+  arrivalTime Int?
+
+  routeId     Int
+  route       Route @relation(fields: [routeId], references: [id])
+
+  locationId  Int
+  location    Location @relation(fields: [locationId], references: [id])
+}
