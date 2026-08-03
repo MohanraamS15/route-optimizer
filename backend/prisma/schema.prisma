@@ -9,7 +9,7 @@ datasource db {
 }
 
 enum OptimizationStatus {
-  PENDING
+  DRAFT
   PROCESSING
   COMPLETED
   FAILED
@@ -28,20 +28,22 @@ model User {
 }
 
 model OptimizationJob {
-  id           Int                 @id @default(autoincrement())
-  status       OptimizationStatus  @default(PENDING)
+  id            Int                 @id @default(autoincrement())
 
-  vehicleCount Int
-  depotIndex   Int
+  jobName       String
+  status        OptimizationStatus  @default(DRAFT)
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  vehicleCount  Int
+  depotIndex    Int?
 
-  userId       Int?
-  user         User? @relation(fields: [userId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  locations    Location[]
-  routes       Route[]
+  userId        Int
+  user          User @relation(fields: [userId], references: [id])
+
+  locations     Location[]
+  routes        Route[]
 }
 
 model Location {
