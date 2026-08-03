@@ -5,24 +5,30 @@ from ortools.constraint_solver import routing_enums_pb2
 def solve_route(
     time_matrix,
     num_vehicles,
-    depot,
+    start_index,
+    end_index,
     demands,
     vehicle_capacities,
     time_windows,
 ):
+    # One start and one end for every vehicle
+    starts = [start_index] * num_vehicles
+    ends = [end_index] * num_vehicles
 
     manager = pywrapcp.RoutingIndexManager(
         len(time_matrix),
         num_vehicles,
-        depot,
+        starts,
+        ends,
     )
 
     routing = pywrapcp.RoutingModel(manager)
 
+    # ------------------------
     # Time Callback
+    # ------------------------
 
     def time_callback(from_index, to_index):
-
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
 
@@ -32,17 +38,21 @@ def solve_route(
 
     routing.SetArcCostEvaluatorOfAllVehicles(transit_callback)
 
+    # ------------------------
     # Demand Callback
+    # ------------------------
 
     def demand_callback(from_index):
-
         from_node = manager.IndexToNode(from_index)
-
         return demands[from_node]
 
-    demand_callback_index = routing.RegisterUnaryTransitCallback(demand_callback)
+    demand_callback_index = routing.RegisterUnaryTransitCallback(
+        demand_callback
+    )
 
+    # ------------------------
     # Capacity Dimension
+    # ------------------------
 
     routing.AddDimensionWithVehicleCapacity(
         demand_callback_index,
@@ -51,7 +61,7 @@ def solve_route(
         True,
         "Capacity",
     )
-    
+
     # ------------------------
     # Time Dimension
     # ------------------------
@@ -66,26 +76,34 @@ def solve_route(
 
     time_dimension = routing.GetDimensionOrDie("Time")
 
+    # Apply time windows to all customer locations
     for location_idx, time_window in enumerate(time_windows):
-
-        if location_idx == depot:
+        if location_idx == start_index or location_idx == end_index:
             continue
 
         index = manager.NodeToIndex(location_idx)
-
         time_dimension.CumulVar(index).SetRange(
             time_window[0],
             time_window[1],
         )
 
-    depot_index = manager.NodeToIndex(depot)
+    # Apply the start and end time windows to every vehicle's start and end nodes
+    for vehicle_id in range(num_vehicles):
+        start = routing.Start(vehicle_id)
+        time_dimension.CumulVar(start).SetRange(
+            time_windows[start_index][0],
+            time_windows[start_index][1],
+        )
 
-    time_dimension.CumulVar(depot_index).SetRange(
-        time_windows[depot][0],
-        time_windows[depot][1],
-    )
+        end = routing.End(vehicle_id)
+        time_dimension.CumulVar(end).SetRange(
+            time_windows[end_index][0],
+            time_windows[end_index][1],
+        )
 
+    # ------------------------
     # Search Parameters
+    # ------------------------
 
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
 
@@ -93,12 +111,18 @@ def solve_route(
         routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
     )
 
+    print("Before Solve")
+
     solution = routing.SolveWithParameters(search_parameters)
 
-    if not solution:
+    print("After Solve")
+
+    if solution is None:
         return None
 
+    # ------------------------
     # Extract Routes
+    # ------------------------
 
     routes = []
 
@@ -116,8 +140,6 @@ def solve_route(
 
         route.append(manager.IndexToNode(index))
 
-        # Ignore unused vehicles
-        # if len(route) > 2:
         routes.append(route)
 
     return routes

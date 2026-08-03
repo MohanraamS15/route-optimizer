@@ -1,5 +1,14 @@
-import { createJob, getUserJobs, getJobById, deleteJob, updateJob } from "./optimization.service.js";
-import { createOptimizationJobSchema, updateOptimizationJobSchema } from "./optimization.validation.js";
+import {
+  createJob,
+  getUserJobs,
+  getJobById,
+  deleteJob,
+  updateJob,
+} from "./optimization.service.js";
+import {
+  createOptimizationJobSchema,
+  updateOptimizationJobSchema,
+} from "./optimization.validation.js";
 
 export const create = async (req, res) => {
   try {
@@ -51,7 +60,9 @@ export const getSingle = async (req, res) => {
     const userId = req.user.id;
 
     if (isNaN(jobId)) {
-      return res.status(400).json({ success: false, error: "Invalid job ID format" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid job ID format" });
     }
 
     const job = await getJobById(jobId, userId);
@@ -63,10 +74,10 @@ export const getSingle = async (req, res) => {
   } catch (error) {
     // If it's our custom errors (Not Found or Unauthorized)
     if (error.message === "Job not found") {
-        return res.status(404).json({ success: false, error: error.message });
+      return res.status(404).json({ success: false, error: error.message });
     }
     if (error.message === "Unauthorized to access this job") {
-        return res.status(403).json({ success: false, error: error.message });
+      return res.status(403).json({ success: false, error: error.message });
     }
 
     return res.status(500).json({
@@ -82,7 +93,9 @@ export const remove = async (req, res) => {
     const userId = req.user.id;
 
     if (isNaN(jobId)) {
-        return res.status(400).json({ success: false, error: "Invalid job ID format" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid job ID format" });
     }
 
     await deleteJob(jobId, userId);
@@ -93,10 +106,10 @@ export const remove = async (req, res) => {
     });
   } catch (error) {
     if (error.message === "Job not found") {
-        return res.status(404).json({ success: false, error: error.message });
+      return res.status(404).json({ success: false, error: error.message });
     }
     if (error.message === "Unauthorized to delete this job") {
-        return res.status(403).json({ success: false, error: error.message });
+      return res.status(403).json({ success: false, error: error.message });
     }
 
     return res.status(500).json({
@@ -112,7 +125,9 @@ export const update = async (req, res) => {
     const userId = req.user.id;
 
     if (isNaN(jobId)) {
-      return res.status(400).json({ success: false, error: "Invalid job ID format" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid job ID format" });
     }
 
     const validateData = updateOptimizationJobSchema.safeParse(req.body);
@@ -123,6 +138,8 @@ export const update = async (req, res) => {
         error: validateData.error,
       });
     }
+    console.log("Request Body:", req.body);
+    console.log("Validated Data:", validateData.data); // Debugging line
 
     const updatedJob = await updateJob(jobId, userId, validateData.data);
 
@@ -132,14 +149,16 @@ export const update = async (req, res) => {
       job: updatedJob,
     });
   } catch (error) {
-    if (error.message === "Job not found") {
-      return res.status(404).json({ success: false, error: error.message });
-    }
-    if (error.message === "Unauthorized to access this job") {
-      return res.status(403).json({ success: false, error: error.message });
-    }
-    if (error.message === "Invalid depotIndex" || error.message === "Cannot set depotIndex because no locations exist yet") {
-      return res.status(400).json({ success: false, error: error.message });
+    if (
+      error.message === "Invalid startIndex" ||
+      error.message === "Invalid endIndex" ||
+      error.message ===
+        "Cannot set start/end location because no locations exist yet"
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
     }
 
     return res.status(500).json({

@@ -20,17 +20,23 @@ def home():
 
 @app.post("/optimize",response_model=OptimizeResponse)  
 def optimize(request: OptimizeRequest):
-
+    
+    print("1. Request validated")
+    
     validate_request(request)
 
     coordinates = request.coordinates
 
+    print("2. Validation completed")
+
     time_matrix, distance_matrix = get_matrix(coordinates)
+    print("3. OSRM completed")
 
     routes = solve_route(
         time_matrix=time_matrix,
         num_vehicles=request.num_vehicles,
-        depot=request.depot,
+        start_index=request.start_index,
+        end_index=request.end_index,
         demands=request.demands,
         vehicle_capacities=request.vehicle_capacities,
         time_windows=request.time_windows,
@@ -41,6 +47,8 @@ def optimize(request: OptimizeRequest):
             status_code=400,
             detail="No feasible route found for the given constraints."
         )
+        
+    print("4. Solver completed")
 
     return build_response(
         routes,
