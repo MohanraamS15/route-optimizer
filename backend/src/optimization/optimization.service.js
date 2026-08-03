@@ -187,5 +187,115 @@ export const optimizeJob = async (jobId, userId) => {
 
   const result = await optimize(payload);
 
-  return result;
+  // ------------------------
+  // Persist Routes in DB
+  // ------------------------
+
+  // 1. Delete previous routes
+  await prisma.route.deleteMany({
+    where: { jobId: jobId },
+  });
+
+  // 2. Create new route records & RouteStops
+  for (const routeData of result.routes) {
+    const newRoute = await prisma.route.create({
+      data: {
+        vehicleIndex: routeData.vehicle_id,
+        totalDistance: routeData.distance,
+        totalDuration: routeData.duration,
+        totalLoad: routeData.load,
+        jobId: jobId,
+      },
+    });
+
+    // Create RouteStop records
+    const routeStopsData = routeData.route.map((locationIndex, sequence) => {
+      const locationId = locations[locationIndex].id;
+      return {
+        sequence: sequence,
+        routeId: newRoute.id,
+        locationId: locationId,
+        arrivalTime: null,
+      };
+    });
+
+    await prisma.routeStop.createMany({
+      data: routeStopsData,
+    });
+  }
+
+  // 3. Update Job Status
+  await prisma.optimizationJob.update({
+    where: { id: jobId },
+    data: { status: "COMPLETED" },
+  });
+
+  return { success: true };
+};
+
+export const getOptimizationResult = async (jobId, userId) => {
+  const job = await prisma.optimizationJob.findUnique({
+    where: { id: jobId },
+    include: {
+      routes: {
+        include: {
+          stops: {
+            orderBy: { sequence: "asc" },
+            include: {
+              location: true,
+            },
+          },
+        },
+        orderBy: { vehicleIndex: "asc" },
+      },
+    },
+  });
+
+  if (!job) {
+    throw new Error("Job not found");
+  }
+
+  if (job.userId !== userId) {
+    throw new Error("Unauthorized to access this job");
+  }
+
+  if (job.status !== "COMPLETED") {
+    throw new Error("Optimization result is not available yet. Please run optimization first.");
+  }
+
+  // Calculate totals across all routes
+  let grandTotalDistance = 0;
+  let grandTotalDuration = 0;
+
+  const formattedRoutes = job.routes.map((route) => {
+    grandTotalDistance += route.totalDistance;
+    grandTotalDuration += route.totalDuration;
+
+    return {
+      vehicleIndex: route.vehicleIndex,
+      // Convert distance to km (meters / 1000)
+      distanceKm: Number((route.totalDistance / 1000).toFixed(2)),
+      // Convert duration to minutes (seconds / 60)
+      durationMinutes: Number((route.totalDuration / 60).toFixed(2)),
+      load: route.totalLoad,
+      stops: route.stops.map((stop) => ({
+        sequence: stop.sequence + 1, // 1-indexed for users
+        address: stop.location.address,
+        latitude: stop.location.latitude,
+        longitude: stop.location.longitude,
+        demand: stop.location.demand ?? 0,
+      })),
+    };
+  });
+
+  return {
+    jobId: job.id,
+    jobName: job.jobName,
+    status: job.status,
+    summary: {
+      totalDistanceKm: Number((grandTotalDistance / 1000).toFixed(2)),
+      totalDurationMinutes: Number((grandTotalDuration / 60).toFixed(2)),
+    },
+    routes: formattedRoutes,
+  };
 };

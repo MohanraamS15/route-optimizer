@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authenticate } from "../middlewares/auth.middleware.js";
-import { create, getAll, getSingle, remove, update, optimize } from "./optimization.controller.js";
+import { create, getAll, getSingle, remove, update, optimize, getResult } from "./optimization.controller.js";
 
 const router = Router();
 
@@ -13,5 +13,6 @@ router.get("/:id", getSingle);
 router.patch("/:id", update);
 router.delete("/:id", remove);
 router.post("/:id/optimize", optimize);
+router.get("/:id/result", getResult);
 
 export default router;

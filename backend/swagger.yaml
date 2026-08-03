@@ -1,0 +1,318 @@
+openapi: 3.0.0
+info:
+  title: Route Optimization API
+  description: A microservices-based API for route optimization using Google OR-Tools and OSRM.
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - bearerAuth: []
+paths:
+  /auth/register:
+    post:
+      summary: Register a new user
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - password
+              properties:
+                name:
+                  type: string
+                  example: John Doe
+                email:
+                  type: string
+                  format: email
+                  example: john@example.com
+                password:
+                  type: string
+                  format: password
+                  example: secret123
+      responses:
+        '201':
+          description: User registered successfully
+        '400':
+          description: Validation error
+        '409':
+          description: Email already in use
+
+  /auth/login:
+    post:
+      summary: Login user
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+        '401':
+          description: Invalid credentials
+
+  /auth/me:
+    get:
+      summary: Get current authenticated user
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: User details retrieved
+        '401':
+          description: Unauthorized
+
+  /optimization:
+    post:
+      summary: Create a new optimization job
+      tags:
+        - Optimization Jobs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - jobName
+                - vehicleCount
+              properties:
+                jobName:
+                  type: string
+                  example: "Morning Delivery Run"
+                vehicleCount:
+                  type: integer
+                  example: 2
+      responses:
+        '201':
+          description: Job created
+    get:
+      summary: Get all optimization jobs for the current user
+      tags:
+        - Optimization Jobs
+      responses:
+        '200':
+          description: List of jobs
+
+  /optimization/{id}:
+    get:
+      summary: Get a specific optimization job
+      tags:
+        - Optimization Jobs
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Job retrieved
+        '404':
+          description: Job not found
+    patch:
+      summary: Update job settings (e.g., start/end indices)
+      tags:
+        - Optimization Jobs
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                jobName:
+                  type: string
+                vehicleCount:
+                  type: integer
+                startIndex:
+                  type: integer
+                endIndex:
+                  type: integer
+      responses:
+        '200':
+          description: Job updated
+    delete:
+      summary: Delete an optimization job
+      tags:
+        - Optimization Jobs
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Job deleted
+
+  /optimization/{id}/locations:
+    post:
+      summary: Add multiple locations to an optimization job
+      tags:
+        - Locations
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - locations
+              properties:
+                locations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - address
+                    properties:
+                      address:
+                        type: string
+                        example: "Anna Nagar, Chennai"
+                      demand:
+                        type: integer
+                        example: 5
+      responses:
+        '201':
+          description: Locations added and geocoded
+        '409':
+          description: Duplicate physical coordinates detected
+        '404':
+          description: Job not found
+
+  /optimization/{id}/optimize:
+    post:
+      summary: Trigger route optimization engine
+      tags:
+        - Optimizer Engine
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Optimization complete and saved to database
+        '400':
+          description: Validation error (e.g., missing start/end)
+
+  /optimization/{id}/result:
+    get:
+      summary: Retrieve the completed optimized routes
+      tags:
+        - Optimizer Engine
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Returns formatted routes, distances, and durations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      jobId:
+                        type: integer
+                      jobName:
+                        type: string
+                      status:
+                        type: string
+                      summary:
+                        type: object
+                        properties:
+                          totalDistanceKm:
+                            type: number
+                          totalDurationMinutes:
+                            type: number
+                      routes:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            vehicleIndex:
+                              type: integer
+                            distanceKm:
+                              type: number
+                            durationMinutes:
+                              type: number
+                            load:
+                              type: integer
+                            stops:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  sequence:
+                                    type: integer
+                                  address:
+                                    type: string
+                                  latitude:
+                                    type: number
+                                  longitude:
+                                    type: number
+                                  demand:
+                                    type: integer
