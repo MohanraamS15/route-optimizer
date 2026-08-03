@@ -46,6 +46,8 @@ export const addLocations = async (jobId, userId, locationsData) => {
         latitude: geoData.latitude,
         longitude: geoData.longitude,
         demand: loc.demand !== undefined ? loc.demand : null,
+        timeWindowStart: loc.timeWindowStart !== undefined ? loc.timeWindowStart : null,
+        timeWindowEnd: loc.timeWindowEnd !== undefined ? loc.timeWindowEnd : null,
         jobId: jobId,
       },
     });

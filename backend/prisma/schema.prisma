@@ -15,6 +15,11 @@ enum OptimizationStatus {
   FAILED
 }
 
+enum RouteType {
+  DELIVERY
+  TRIP_PLANNER
+}
+
 model User {
   id        Int      @id @default(autoincrement())
   name      String
@@ -32,7 +37,9 @@ model OptimizationJob {
 
   jobName       String
 
-  vehicleCount  Int
+  routeType     RouteType           @default(DELIVERY)
+
+  vehicleCount  Int?
 
   startIndex    Int?
   endIndex      Int?
@@ -50,17 +57,19 @@ model OptimizationJob {
 }
 
 model Location {
-  id          Int      @id @default(autoincrement())
+  id              Int      @id @default(autoincrement())
 
-  address     String
+  address         String
 
-  latitude    Float
-  longitude   Float
+  latitude        Float
+  longitude       Float
 
-  demand      Int?
+  demand          Int?
+  timeWindowStart Int?
+  timeWindowEnd   Int?
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   jobId       Int
   job         OptimizationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)

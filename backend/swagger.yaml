@@ -121,6 +121,10 @@ paths:
                 jobName:
                   type: string
                   example: "Morning Delivery Run"
+                routeType:
+                  type: string
+                  enum: [DELIVERY, TRIP_PLANNER]
+                  example: "DELIVERY"
                 vehicleCount:
                   type: integer
                   example: 2
@@ -226,6 +230,12 @@ paths:
                       demand:
                         type: integer
                         example: 5
+                      timeWindowStart:
+                        type: integer
+                        example: 32400
+                      timeWindowEnd:
+                        type: integer
+                        example: 61200
       responses:
         '201':
           description: Locations added and geocoded

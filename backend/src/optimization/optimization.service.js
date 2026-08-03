@@ -5,6 +5,7 @@ export const createJob = async (userId, data) => {
   const job = await prisma.optimizationJob.create({
     data: {
       jobName: data.jobName,
+      routeType: data.routeType,
       vehicleCount: data.vehicleCount,
       status: "DRAFT",
       userId: userId,
@@ -160,25 +161,31 @@ export const optimizeJob = async (jobId, userId) => {
   // Build FastAPI Payload
   // ------------------------
 
+  const isTripPlanner = job.routeType === "TRIP_PLANNER";
+  const numVehicles = isTripPlanner ? 1 : job.vehicleCount;
+
   const payload = {
     coordinates: locations.map((location) => [
       location.longitude,
       location.latitude,
     ]),
 
-    num_vehicles: job.vehicleCount,
+    num_vehicles: numVehicles,
 
     start_index: job.startIndex,
 
     end_index: job.endIndex,
 
-    demands: locations.map((location) => location.demand ?? 0),
+    demands: locations.map((location) => (isTripPlanner ? 0 : (location.demand ?? 0))),
 
-    // Temporary default capacity
-    vehicle_capacities: Array(job.vehicleCount).fill(100),
+    // Default capacity: Unlimited for trip planner, 100 for delivery
+    vehicle_capacities: Array(numVehicles).fill(isTripPlanner ? 1000000 : 100),
 
-    // Temporary default time windows (86400 seconds = 24 hours)
-    time_windows: locations.map(() => [0, 86400]),
+    // Time windows from DB, default to whole day (0 -> 86400)
+    time_windows: locations.map((loc) => [
+      loc.timeWindowStart !== null ? loc.timeWindowStart : 0,
+      loc.timeWindowEnd !== null ? loc.timeWindowEnd : 86400
+    ]),
   };
 
   // ------------------------
