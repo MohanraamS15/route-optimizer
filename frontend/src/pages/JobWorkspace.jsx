@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import axiosClient from "../api/axiosClient";
+import { parseError } from "../utils/errorHandler";
 import InteractiveMap from "../components/InteractiveMap";
 
 export default function JobWorkspace() {
@@ -97,7 +98,7 @@ export default function JobWorkspace() {
       setTimeWindowStart("");
       setTimeWindowEnd("");
     } catch (err) {
-      alert(err.response?.data?.error || "Failed to add location");
+      alert("Failed to add location: " + parseError(err));
     } finally {
       setLoading(false);
     }
@@ -111,7 +112,7 @@ export default function JobWorkspace() {
       });
       alert("Start and End locations saved!");
     } catch (err) {
-      alert(err.response?.data?.error || "Failed to set endpoints");
+      alert("Failed to set endpoints: " + parseError(err));
     }
   };
 
@@ -127,7 +128,7 @@ export default function JobWorkspace() {
       fetchJobDetails(); 
       fetchOptimizationResult();
     } catch (err) {
-      alert(err.response?.data?.error || "Optimization failed");
+      alert("Optimization failed: " + parseError(err));
     } finally {
       setLoading(false);
     }
@@ -149,12 +150,7 @@ export default function JobWorkspace() {
       await axiosClient.put(`/optimization/${id}/vehicles`, { vehicles: payload });
       alert("Vehicles saved successfully!");
     } catch (err) {
-      const errorData = err.response?.data?.error || err.response?.data;
-      if (typeof errorData === 'object') {
-        alert("Validation Error:\n" + JSON.stringify(errorData, null, 2));
-      } else {
-        alert(errorData || "Failed to save vehicles");
-      }
+      alert("Failed to save vehicles:\n" + parseError(err));
     } finally {
       setSavingVehicles(false);
     }
@@ -167,7 +163,7 @@ export default function JobWorkspace() {
       await resetEndpoints();
       fetchLocations();
     } catch (err) {
-      alert("Failed to delete location");
+      alert("Failed to delete location: " + parseError(err));
     }
   };
 
@@ -206,15 +202,7 @@ export default function JobWorkspace() {
       await resetEndpoints();
       fetchLocations();
     } catch (err) {
-      const errorData = err.response?.data?.error || err.response?.data;
-      console.error("Full error response:", err.response);
-      
-      if (typeof errorData === 'object') {
-        // Stringify it nicely so it doesn't just say [object Object]
-        alert("Error details:\n" + JSON.stringify(errorData, null, 2));
-      } else {
-        alert(errorData || "Failed to update location");
-      }
+      alert("Failed to update location:\n" + parseError(err));
     }
   };
 

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import axiosClient from "../api/axiosClient";
+import { parseError } from "../utils/errorHandler";
 
 export default function CreateJobForm({ onJobCreated }) {
   const [jobName, setJobName] = useState("");
@@ -33,19 +34,7 @@ export default function CreateJobForm({ onJobCreated }) {
       setRouteType("DELIVERY");
       setVehicleCount(1);
     } catch (err) {
-      const errorData = err.response?.data?.error;
-      
-      if (Array.isArray(errorData) && errorData.length > 0) {
-        setError(errorData[0].message);
-      } else if (errorData && typeof errorData === 'object') {
-        if (errorData.issues && errorData.issues.length > 0) {
-          setError(errorData.issues[0].message);
-        } else {
-          setError(errorData.message || JSON.stringify(errorData));
-        }
-      } else {
-        setError(errorData || "Failed to create job");
-      }
+      setError(parseError(err, "Failed to create job"));
     }
   };
 

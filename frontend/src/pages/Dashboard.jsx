@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import axiosClient from "../api/axiosClient";
+import { parseError } from "../utils/errorHandler";
 import CreateJobForm from "../components/CreateJobForm";
 
 export default function Dashboard() {
@@ -40,7 +41,7 @@ export default function Dashboard() {
       // Remove it from the screen
       setJobs(jobs.filter(job => job.id !== jobId));
     } catch (err) {
-      alert("Failed to delete job");
+      alert("Failed to delete job: " + parseError(err));
     }
   };
 

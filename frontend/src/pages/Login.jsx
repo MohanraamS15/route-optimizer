@@ -2,6 +2,7 @@ import { useState, useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import axiosClient from "../api/axiosClient";
 import { useNavigate, Link } from "react-router-dom";
+import { parseError } from "../utils/errorHandler";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -20,7 +21,7 @@ export default function Login() {
       login(response.data.token);
       navigate("/dashboard");
     } catch (err) {
-      setError(err.response?.data?.error || "Login failed");
+      setError(parseError(err, "Login failed"));
     }
   };
 

@@ -1,20 +1,16 @@
 import {registerUser, loginUser} from './auth.service.js';
 import {registerSchema, loginSchema} from './auth.validation.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 
+export const register = asyncHandler(async (req, res, next) => {
+    const result=registerSchema.safeParse(req.body);
 
-export const register = async (req, res) => {
+    if(!result.success){
+        return next(Object.assign(new Error(), { name: 'ZodError', errors: result.error.issues, statusCode: 400 }));
+    }
+
     try {
-        const result=registerSchema.safeParse(req.body);
-
-        if(!result.success){
-            return res.status(400).json({
-                success: false,
-                error: result.error
-            });
-        }
-
         const user = await registerUser(result.data);
-
         return res.status(200).json({
             success: true,
             message: "Registration successful",
@@ -22,25 +18,21 @@ export const register = async (req, res) => {
         });
     } catch (error) {
         if (error.message === "Email already exists") {
-            return res.status(409).json({ success: false, error: error.message });
+            error.statusCode = 409;
         }
-        return res.status(500).json({ success: false, error: "Internal server error" });
+        return next(error);
     }
-};
+});
 
-export const login = async (req, res) => {
+export const login = asyncHandler(async (req, res, next) => {
+    const validateData=loginSchema.safeParse(req.body);
+
+    if(!validateData.success){
+        return next(Object.assign(new Error(), { name: 'ZodError', errors: validateData.error.issues, statusCode: 400 }));
+    }
+
     try {
-        const validateData=loginSchema.safeParse(req.body);
-
-        if(!validateData.success){
-            return res.status(400).json({
-                success: false,
-                error: validateData.error
-            });
-        }
-
         const { token } = await loginUser(validateData.data);
-
         return res.status(200).json({
             success: true,
             message: "Login successful",
@@ -48,15 +40,15 @@ export const login = async (req, res) => {
         });
     } catch (error) {
         if (error.message === "Invalid credentials") {
-            return res.status(401).json({ success: false, error: error.message });
+            error.statusCode = 401;
         }
-        return res.status(500).json({ success: false, error: "Internal server error" });
+        return next(error);
     }
-};
+});
 
-export const me = async (req, res) => {
+export const me = asyncHandler(async (req, res) => {
     return res.status(200).json({
         success: true,
         user: req.user
     });
-};
+});

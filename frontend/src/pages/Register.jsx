@@ -2,6 +2,7 @@ import { useState, useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import axiosClient from "../api/axiosClient";
 import { useNavigate, Link } from "react-router-dom";
+import { parseError } from "../utils/errorHandler";
 
 export default function Register() {
   const [name, setName] = useState("");
@@ -22,7 +23,7 @@ export default function Register() {
       // It does NOT return a token. So we must redirect to login.
       navigate("/login");
     } catch (err) {
-      setError(err.response?.data?.error || "Registration failed");
+      setError(parseError(err, "Registration failed"));
     }
   };
 
