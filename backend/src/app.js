@@ -20,6 +20,6 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.use("/auth", authRoutes);
 app.use("/optimization", optimizationRoutes);
-app.use("/locations", locationRoutes);
+app.use("/optimization", locationRoutes);
 
 export default app;

@@ -100,5 +100,5 @@ model RouteStop {
   route         Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
 
   locationId    Int
-  location      Location @relation(fields: [locationId], references: [id])
+  location      Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 }

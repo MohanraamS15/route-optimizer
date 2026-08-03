@@ -6,12 +6,12 @@ const router = Router();
 
 router.use(authenticate);
 
-// These will be mounted at /locations in app.js
-// If you want them to be strictly /optimization/:jobId/locations,
-// we should ideally mount them in optimization.routes.js, but keeping them here per instructions!
-router.post("/optimization/:jobId/locations", addLocations);
-router.get("/optimization/:jobId/locations", getLocations);
-router.patch("/:locationId", updateLocation);
-router.delete("/:locationId", deleteLocation);
+// Mount under /optimization in app.js so it becomes /optimization/:jobId/locations
+router.post("/:jobId/locations", addLocations);
+router.get("/:jobId/locations", getLocations);
+
+// Specific location updates
+router.patch("/location/:locationId", updateLocation);
+router.delete("/location/:locationId", deleteLocation);
 
 export default router;
