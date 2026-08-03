@@ -1,12 +1,16 @@
 import {registerUser, loginUser} from './auth.service.js';
 import {registerSchema, loginSchema} from './auth.validation.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import AppError from '../utils/AppError.js';
 
 export const register = asyncHandler(async (req, res, next) => {
     const result=registerSchema.safeParse(req.body);
 
     if(!result.success){
-        return next(Object.assign(new Error(), { name: 'ZodError', errors: result.error.issues, statusCode: 400 }));
+        const err = new AppError("Validation failed", 400);
+        err.name = 'ZodError';
+        err.errors = result.error.issues;
+        return next(err);
     }
 
     try {
@@ -18,7 +22,7 @@ export const register = asyncHandler(async (req, res, next) => {
         });
     } catch (error) {
         if (error.message === "Email already exists") {
-            error.statusCode = 409;
+            return next(new AppError(error.message, 409));
         }
         return next(error);
     }
@@ -28,7 +32,10 @@ export const login = asyncHandler(async (req, res, next) => {
     const validateData=loginSchema.safeParse(req.body);
 
     if(!validateData.success){
-        return next(Object.assign(new Error(), { name: 'ZodError', errors: validateData.error.issues, statusCode: 400 }));
+        const err = new AppError("Validation failed", 400);
+        err.name = 'ZodError';
+        err.errors = validateData.error.issues;
+        return next(err);
     }
 
     try {
@@ -40,7 +47,7 @@ export const login = asyncHandler(async (req, res, next) => {
         });
     } catch (error) {
         if (error.message === "Invalid credentials") {
-            error.statusCode = 401;
+            return next(new AppError(error.message, 401));
         }
         return next(error);
     }

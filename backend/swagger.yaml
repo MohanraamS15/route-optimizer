@@ -135,9 +135,22 @@ paths:
       summary: Get all optimization jobs for the current user
       tags:
         - Optimization Jobs
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Number of jobs per page
       responses:
         '200':
-          description: List of jobs
+          description: List of jobs and pagination metadata
 
   /optimization/{id}:
     get:
@@ -197,6 +210,45 @@ paths:
         '200':
           description: Job deleted
 
+  /optimization/{id}/vehicles:
+    put:
+      summary: Update vehicles for a specific job
+      tags:
+        - Vehicles
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - vehicles
+              properties:
+                vehicles:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - id
+                      - name
+                      - capacity
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      capacity:
+                        type: integer
+      responses:
+        '200':
+          description: Vehicles updated successfully
+
   /optimization/{id}/locations:
     post:
       summary: Add multiple locations to an optimization job
@@ -243,6 +295,76 @@ paths:
           description: Duplicate physical coordinates detected
         '404':
           description: Job not found
+    get:
+      summary: Get all locations for a specific job
+      tags:
+        - Locations
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of locations retrieved successfully
+        '404':
+          description: Job not found
+
+  /optimization/{jobId}/locations/{locationId}:
+    put:
+      summary: Update a specific location
+      tags:
+        - Locations
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: locationId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                demand:
+                  type: integer
+                timeWindowStart:
+                  type: integer
+                timeWindowEnd:
+                  type: integer
+      responses:
+        '200':
+          description: Location updated successfully
+        '404':
+          description: Location not found
+    delete:
+      summary: Delete a specific location
+      tags:
+        - Locations
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: locationId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Location deleted successfully
+        '404':
+          description: Location not found
 
   /optimization/{id}/optimize:
     post:
@@ -326,3 +448,5 @@ paths:
                                     type: number
                                   demand:
                                     type: integer
+                                  distanceFromPreviousKm:
+                                    type: number

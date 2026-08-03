@@ -1,16 +1,17 @@
 import * as locationService from "./location.service.js";
 import { createLocationsSchema, updateLocationSchema } from "./location.validation.js";
 import { asyncHandler } from '../utils/asyncHandler.js';
+import AppError from '../utils/AppError.js';
 
 const handleErrorResponse = (error, next) => {
   if (error.message === "Job not found" || error.message === "Location not found") {
-    error.statusCode = 404;
+    return next(new AppError(error.message, 404));
   } else if (error.message.includes("Unauthorized")) {
-    error.statusCode = 403;
+    return next(new AppError(error.message, 403));
   } else if (error.message === "Address not found." || error.message === "Failed to fetch coordinates from Nominatim.") {
-    error.statusCode = 400;
+    return next(new AppError(error.message, 400));
   } else if (error.message === "Location already exists in this optimization job.") {
-    error.statusCode = 409;
+    return next(new AppError(error.message, 409));
   }
   return next(error);
 };
@@ -20,13 +21,16 @@ export const addLocations = asyncHandler(async (req, res, next) => {
   const userId = req.user.id;
 
   if (isNaN(jobId)) {
-    return next(Object.assign(new Error("Invalid job ID format"), { statusCode: 400 }));
+    return next(new AppError("Invalid job ID format", 400));
   }
 
   const validateData = createLocationsSchema.safeParse(req.body);
 
   if (!validateData.success) {
-    return next(Object.assign(new Error(), { name: 'ZodError', errors: validateData.error.issues, statusCode: 400 }));
+    const err = new AppError("Validation failed", 400);
+    err.name = 'ZodError';
+    err.errors = validateData.error.issues;
+    return next(err);
   }
 
   try {
@@ -46,7 +50,7 @@ export const getLocations = asyncHandler(async (req, res, next) => {
   const userId = req.user.id;
 
   if (isNaN(jobId)) {
-    return next(Object.assign(new Error("Invalid job ID format"), { statusCode: 400 }));
+    return next(new AppError("Invalid job ID format", 400));
   }
 
   try {
@@ -65,13 +69,16 @@ export const updateLocation = asyncHandler(async (req, res, next) => {
   const userId = req.user.id;
 
   if (isNaN(locationId)) {
-    return next(Object.assign(new Error("Invalid location ID format"), { statusCode: 400 }));
+    return next(new AppError("Invalid location ID format", 400));
   }
 
   const validateData = updateLocationSchema.safeParse(req.body);
 
   if (!validateData.success) {
-    return next(Object.assign(new Error(), { name: 'ZodError', errors: validateData.error.issues, statusCode: 400 }));
+    const err = new AppError("Validation failed", 400);
+    err.name = 'ZodError';
+    err.errors = validateData.error.issues;
+    return next(err);
   }
 
   try {
@@ -91,7 +98,7 @@ export const deleteLocation = asyncHandler(async (req, res, next) => {
   const userId = req.user.id;
 
   if (isNaN(locationId)) {
-    return next(Object.assign(new Error("Invalid location ID format"), { statusCode: 400 }));
+    return next(new AppError("Invalid location ID format", 400));
   }
 
   try {

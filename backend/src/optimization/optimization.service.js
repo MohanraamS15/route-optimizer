@@ -275,48 +275,50 @@ export const optimizeJob = async (jobId, userId) => {
   console.log("Python Backend Response for first route:", JSON.stringify(result.routes[0], null, 2));
 
   // ------------------------
-  // Persist Routes in DB
+  // Persist Routes in DB (Atomic Transaction)
   // ------------------------
 
-  // 1. Delete previous routes
-  await prisma.route.deleteMany({
-    where: { jobId: jobId },
-  });
-
-  // 2. Create new route records & RouteStops
-  for (const routeData of result.routes) {
-    const newRoute = await prisma.route.create({
-      data: {
-        vehicleIndex: routeData.vehicle_id,
-        totalDistance: routeData.distance,
-        totalDuration: routeData.duration,
-        totalLoad: routeData.load,
-        jobId: jobId,
-      },
+  await prisma.$transaction(async (tx) => {
+    // 1. Delete previous routes
+    await tx.route.deleteMany({
+      where: { jobId: jobId },
     });
 
-    // Create RouteStop records
-    const stopsArray = routeData.stops || routeData.route.map(nodeIdx => ({ location_index: nodeIdx, distance_from_previous: null }));
-    const routeStopsData = stopsArray.map((stop, sequence) => {
-      const locationId = locations[stop.location_index].id;
-      return {
-        sequence: sequence,
-        routeId: newRoute.id,
-        locationId: locationId,
-        distanceFromPrevious: stop.distance_from_previous,
-        arrivalTime: null,
-      };
-    });
+    // 2. Create new route records & RouteStops
+    for (const routeData of result.routes) {
+      const newRoute = await tx.route.create({
+        data: {
+          vehicleIndex: routeData.vehicle_id,
+          totalDistance: routeData.distance,
+          totalDuration: routeData.duration,
+          totalLoad: routeData.load,
+          jobId: jobId,
+        },
+      });
 
-    await prisma.routeStop.createMany({
-      data: routeStopsData,
-    });
-  }
+      // Create RouteStop records
+      const stopsArray = routeData.stops || routeData.route.map(nodeIdx => ({ location_index: nodeIdx, distance_from_previous: null }));
+      const routeStopsData = stopsArray.map((stop, sequence) => {
+        const locationId = locations[stop.location_index].id;
+        return {
+          sequence: sequence,
+          routeId: newRoute.id,
+          locationId: locationId,
+          distanceFromPrevious: stop.distance_from_previous,
+          arrivalTime: null,
+        };
+      });
 
-  // 3. Update Job Status
-  await prisma.optimizationJob.update({
-    where: { id: jobId },
-    data: { status: "COMPLETED" },
+      await tx.routeStop.createMany({
+        data: routeStopsData,
+      });
+    }
+
+    // 3. Update Job Status
+    await tx.optimizationJob.update({
+      where: { id: jobId },
+      data: { status: "COMPLETED" },
+    });
   });
 
   return { success: true };

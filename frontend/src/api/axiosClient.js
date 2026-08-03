@@ -2,8 +2,8 @@ import axios from "axios";
 
 // Create a centralized Axios instance
 const axiosClient = axios.create({
-  // Point to our Node.js backend
-  baseURL: "http://localhost:3000",
+  // Point to our Node.js backend using env variable, fallback to localhost
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:3000",
 });
 
 // INTERCEPTOR: Every time we make an API request, this function runs FIRST.
