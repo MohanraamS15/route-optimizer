@@ -101,6 +101,27 @@ export default function JobWorkspace() {
     } finally { setAddingLocation(false); }
   };
 
+  const handleEndpointChange = async (type, value) => {
+    const val = parseInt(value, 10);
+    const newStart = type === "start" ? val : job.startIndex;
+    const newEnd   = type === "end"   ? val : job.endIndex;
+
+    setJob(prev => ({ ...prev, startIndex: newStart, endIndex: newEnd }));
+
+    if (newStart !== null && newEnd !== null && !isNaN(newStart) && !isNaN(newEnd)) {
+      try {
+        await axiosClient.patch(`/optimization/${id}`, {
+          startIndex: newStart,
+          endIndex: newEnd,
+        });
+        toast("Endpoints saved automatically! Ready to optimize.", "success", 3000);
+        fetchJobDetails();
+      } catch (err) {
+        toast("Failed to save endpoints: " + parseError(err), "error");
+      }
+    }
+  };
+
   const handleSetEndpoints = async () => {
     try {
       await axiosClient.patch(`/optimization/${id}`, {
@@ -113,6 +134,7 @@ export default function JobWorkspace() {
       toast("Failed: " + parseError(err), "error");
     }
   };
+
 
   const handleOptimize = async () => {
     if (job.startIndex === null || job.endIndex === null) {
@@ -352,7 +374,7 @@ export default function JobWorkspace() {
               <div className="form-group mb-2">
                 <label className="form-label">Start Location</label>
                 <select className="form-select" value={job.startIndex ?? ""}
-                  onChange={(e) => setJob({ ...job, startIndex: e.target.value })}>
+                  onChange={(e) => handleEndpointChange("start", e.target.value)}>
                   <option value="" disabled>-- Select --</option>
                   {locations.map((loc, idx) => (
                     <option key={loc.id} value={idx}>{idx}. {loc.address}</option>
@@ -362,7 +384,7 @@ export default function JobWorkspace() {
               <div className="form-group mb-2">
                 <label className="form-label">End Location</label>
                 <select className="form-select" value={job.endIndex ?? ""}
-                  onChange={(e) => setJob({ ...job, endIndex: e.target.value })}>
+                  onChange={(e) => handleEndpointChange("end", e.target.value)}>
                   <option value="" disabled>-- Select --</option>
                   {locations.map((loc, idx) => (
                     <option key={loc.id} value={idx}>{idx}. {loc.address}</option>
