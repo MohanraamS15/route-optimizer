@@ -1,8 +1,10 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import morgan from "morgan";
+import pinoHttp from "pino-http";
 import rateLimit from "express-rate-limit";
+import logger from "./utils/logger.js";
+
 import authRoutes from "./auth/auth.routes.js";
 import optimizationRoutes from "./optimization/optimization.routes.js";
 import locationRoutes from "./location/location.routes.js";
@@ -17,8 +19,9 @@ const app = express();
 // 1. Helmet for Security Headers
 app.use(helmet());
 
-// 2. Morgan for Request Logging
-app.use(morgan("dev"));
+// 2. Structured Pino HTTP Logging
+app.use(pinoHttp({ logger }));
+
 
 // 3. Rate Limiting (Global)
 const limiter = rateLimit({
@@ -30,8 +33,24 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-app.use(cors());
+import { config } from "./config/env.js";
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:8000",
+  config.FASTAPI_URL,
+  process.env.CLIENT_URL,
+].filter(Boolean);
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
+
+
 app.use(express.json());
+
 
 // Load Swagger document
 const swaggerDocument = YAML.load(path.join(process.cwd(), "swagger.yaml"));
@@ -39,9 +58,21 @@ const swaggerDocument = YAML.load(path.join(process.cwd(), "swagger.yaml"));
 // Setup Swagger UI
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
+// System Health Check Endpoint
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "UP",
+    timestamp: new Date().toISOString(),
+    service: "Route Optimizer API",
+  });
+});
+
 app.use("/auth", authRoutes);
+
+
 app.use("/optimization", optimizationRoutes);
 app.use("/optimization", locationRoutes);
+
 
 // Global Error Handler MUST be the last middleware
 app.use(errorHandler);

@@ -68,7 +68,7 @@ def solve_route(
 
     routing.AddDimension(
         transit_callback,
-        30,
+        86400, # Allow up to 24 hours slack (waiting time at locations)
         86400,
         False,
         "Time",
@@ -84,7 +84,7 @@ def solve_route(
 
     time_dimension = routing.GetDimensionOrDie("Time")
 
-    # Apply time windows to all customer locations
+    # Apply strict hard time windows to all customer locations
     for location_idx, time_window in enumerate(time_windows):
         if location_idx == start_index or location_idx == end_index:
             continue
@@ -95,41 +95,39 @@ def solve_route(
             time_window[1],
         )
 
-    # Apply the start and end time windows to every vehicle's start and end nodes
+    # Apply hard time windows to vehicle start and end nodes
     for vehicle_id in range(num_vehicles):
         start = routing.Start(vehicle_id)
-        time_dimension.CumulVar(start).SetRange(
-            time_windows[start_index][0],
-            time_windows[start_index][1],
-        )
+        start_tw = time_windows[start_index]
+        time_dimension.CumulVar(start).SetRange(start_tw[0], start_tw[1])
 
         end = routing.End(vehicle_id)
-        time_dimension.CumulVar(end).SetRange(
-            time_windows[end_index][0],
-            time_windows[end_index][1],
+        end_tw = time_windows[end_index]
+        time_dimension.CumulVar(end).SetRange(end_tw[0], end_tw[1])
+
+    # ------------------------
+    # Search Parameters & Solve
+    # ------------------------
+
+    strategies = [
+        routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC,
+        routing_enums_pb2.FirstSolutionStrategy.AUTOMATIC,
+        routing_enums_pb2.FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION,
+        routing_enums_pb2.FirstSolutionStrategy.SAVINGS,
+    ]
+
+    solution = None
+    for strategy in strategies:
+        search_parameters = pywrapcp.DefaultRoutingSearchParameters()
+        search_parameters.first_solution_strategy = strategy
+        search_parameters.local_search_metaheuristic = (
+            routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
         )
+        search_parameters.time_limit.FromSeconds(2)
 
-    # ------------------------
-    # Search Parameters
-    # ------------------------
-
-    search_parameters = pywrapcp.DefaultRoutingSearchParameters()
-
-    search_parameters.first_solution_strategy = (
-        routing_enums_pb2.FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION
-    )
-    
-    # Enable Guided Local Search to escape local minima
-    search_parameters.local_search_metaheuristic = (
-        routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
-    )
-    search_parameters.time_limit.FromSeconds(2) # 2 seconds time limit for local search
-
-    print("Before Solve")
-
-    solution = routing.SolveWithParameters(search_parameters)
-
-    print("After Solve")
+        solution = routing.SolveWithParameters(search_parameters)
+        if solution is not None:
+            break
 
     if solution is None:
         return None

@@ -1,5 +1,8 @@
+import logger from "../utils/logger.js";
+
 export const errorHandler = (err, req, res, next) => {
-  console.error("Global Error Handler caught:", err);
+  logger.error({ err }, "Global Error Handler caught error");
+
 
   // If it's a known validation error (like from Zod), we can format it
   if (err.name === 'ZodError') {

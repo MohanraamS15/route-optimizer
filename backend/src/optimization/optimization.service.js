@@ -1,5 +1,7 @@
 import prisma from "../config/prisma.js";
 import { optimize } from "../utils/optimizerClient.js";
+import logger from "../utils/logger.js";
+
 
 export const createJob = async (userId, data) => {
   const vehiclesData = [];
@@ -261,10 +263,15 @@ export const optimizeJob = async (jobId, userId) => {
     vehicle_capacities: vehicleCapacities,
 
     // Time windows from DB, default to whole day (0 -> 86400)
-    time_windows: locations.map((loc) => [
-      loc.timeWindowStart !== null ? loc.timeWindowStart : 0,
-      loc.timeWindowEnd !== null ? loc.timeWindowEnd : 86400
-    ]),
+    time_windows: locations.map((loc) => {
+      let start = loc.timeWindowStart !== null && loc.timeWindowStart !== undefined ? Number(loc.timeWindowStart) : 0;
+      let end   = loc.timeWindowEnd   !== null && loc.timeWindowEnd   !== undefined ? Number(loc.timeWindowEnd)   : 86400;
+
+      if (isNaN(start) || start < 0) start = 0;
+      if (isNaN(end) || end <= start || end > 86400) end = 86400;
+
+      return [start, end];
+    }),
   };
 
   // ------------------------
@@ -272,7 +279,8 @@ export const optimizeJob = async (jobId, userId) => {
   // ------------------------
 
   const result = await optimize(payload);
-  console.log("Python Backend Response for first route:", JSON.stringify(result.routes[0], null, 2));
+  logger.info({ route: result.routes[0] }, "Python Backend Response received for optimization");
+
 
   // ------------------------
   // Persist Routes in DB (Atomic Transaction)
@@ -328,6 +336,7 @@ export const getOptimizationResult = async (jobId, userId) => {
   const job = await prisma.optimizationJob.findUnique({
     where: { id: jobId },
     include: {
+      locations: true,
       routes: {
         include: {
           stops: {
@@ -358,26 +367,56 @@ export const getOptimizationResult = async (jobId, userId) => {
   let grandTotalDistance = 0;
   let grandTotalDuration = 0;
 
+  const servedLocationIds = new Set();
+
   const formattedRoutes = job.routes.map((route) => {
     grandTotalDistance += route.totalDistance;
     grandTotalDuration += route.totalDuration;
 
     return {
       vehicleIndex: route.vehicleIndex,
-      // Convert distance to km (meters / 1000)
       distanceKm: Number((route.totalDistance / 1000).toFixed(2)),
-      // Convert duration to minutes (seconds / 60)
       durationMinutes: Number((route.totalDuration / 60).toFixed(2)),
       load: route.totalLoad,
-      stops: route.stops.map((stop) => ({
-        sequence: stop.sequence + 1, // 1-indexed for users
-        address: stop.location.address,
-        latitude: stop.location.latitude,
-        longitude: stop.location.longitude,
-        demand: stop.location.demand ?? 0,
-        distanceFromPreviousKm: stop.distanceFromPrevious ? Number((stop.distanceFromPrevious / 1000).toFixed(2)) : 0,
-      })),
+      stops: route.stops.map((stop) => {
+        servedLocationIds.add(stop.locationId);
+        return {
+          sequence: stop.sequence + 1,
+          address: stop.location.address,
+          latitude: stop.location.latitude,
+          longitude: stop.location.longitude,
+          demand: stop.location.demand ?? 0,
+          timeWindowStart: stop.location.timeWindowStart,
+          timeWindowEnd: stop.location.timeWindowEnd,
+          distanceFromPreviousKm: stop.distanceFromPrevious ? Number((stop.distanceFromPrevious / 1000).toFixed(2)) : 0,
+        };
+      }),
     };
+  });
+
+  // Find locations omitted due to constraint violations (e.g. unreachable time windows)
+  const skippedLocations = (job.locations || [])
+    .filter((loc) => !servedLocationIds.has(loc.id))
+    .map((loc) => ({
+      address: loc.address,
+      timeWindowStart: loc.timeWindowStart,
+      timeWindowEnd: loc.timeWindowEnd,
+    }));
+
+  // Check if any stop violates its time window constraint
+  let hasConstraintWarning = skippedLocations.length > 0;
+  formattedRoutes.forEach((route) => {
+    let cumulSec = 0;
+    route.stops.forEach((s, idx) => {
+      if (idx > 0) {
+        cumulSec += Math.round(s.distanceFromPreviousKm * 72);
+      }
+      if (s.timeWindowEnd !== null && s.timeWindowEnd !== undefined && s.timeWindowEnd < 86400) {
+        if (cumulSec > s.timeWindowEnd + 300) {
+          hasConstraintWarning = true;
+        }
+      }
+    });
   });
 
   return {
@@ -387,6 +426,8 @@ export const getOptimizationResult = async (jobId, userId) => {
     summary: {
       totalDistanceKm: Number((grandTotalDistance / 1000).toFixed(2)),
       totalDurationMinutes: Number((grandTotalDuration / 60).toFixed(2)),
+      hasConstraintWarning,
+      skippedLocations,
     },
     routes: formattedRoutes,
   };

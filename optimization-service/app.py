@@ -29,18 +29,32 @@ def optimize(request: OptimizeRequest):
 
     print("2. Validation completed")
 
-    time_matrix, distance_matrix = get_matrix(coordinates)
-    print("3. OSRM completed")
+    try:
+        time_matrix, distance_matrix = get_matrix(coordinates)
+        print("3. OSRM completed")
+    except Exception as e:
+        print(f"OSRM Error: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to calculate road distances between locations. Please ensure all locations are valid drivable addresses."
+        )
 
-    routes = solve_route(
-        time_matrix=time_matrix,
-        num_vehicles=request.num_vehicles,
-        start_index=request.start_index,
-        end_index=request.end_index,
-        demands=request.demands,
-        vehicle_capacities=request.vehicle_capacities,
-        time_windows=request.time_windows,
-    )
+    try:
+        routes = solve_route(
+            time_matrix=time_matrix,
+            num_vehicles=request.num_vehicles,
+            start_index=request.start_index,
+            end_index=request.end_index,
+            demands=request.demands,
+            vehicle_capacities=request.vehicle_capacities,
+            time_windows=request.time_windows,
+        )
+    except Exception as e:
+        print(f"Solver Exception: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail="Optimization solver encountered an error. Please verify your vehicle capacities and time windows."
+        )
     
     if routes is None:
         raise HTTPException(
@@ -55,4 +69,5 @@ def optimize(request: OptimizeRequest):
         request.demands,
         distance_matrix,
         time_matrix,
+        request.time_windows,
     )
