@@ -2,8 +2,11 @@ import { config } from "../config/env.js";
 
 export async function optimize(payload) {
   let response;
+  const baseUrl = (config.FASTAPI_URL || "http://localhost:8000").replace(/\/+$/, "");
+  const targetUrl = `${baseUrl}/optimize`;
+
   try {
-    response = await fetch(`${config.FASTAPI_URL}/optimize`, {
+    response = await fetch(targetUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
