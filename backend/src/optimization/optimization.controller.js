@@ -11,6 +11,7 @@ import {
 import {
   createOptimizationJobSchema,
   updateOptimizationJobSchema,
+  updateVehiclesSchema,
 } from "./optimization.validation.js";
 import { asyncHandler } from '../utils/asyncHandler.js';
 import AppError from '../utils/AppError.js';
