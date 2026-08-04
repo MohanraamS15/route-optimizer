@@ -14,7 +14,7 @@ export async function optimize(payload) {
       body: JSON.stringify(payload),
     });
   } catch (err) {
-    throw new Error("Optimization service is offline or unreachable.");
+    throw new Error("Optimization service is offline or waking up. Please try again in a few seconds.");
   }
 
   if (!response.ok) {
@@ -22,7 +22,13 @@ export async function optimize(payload) {
 
     try {
       const error = await response.json();
-      errorMessage = error.detail || error.message || errorMessage;
+      if (typeof error.detail === "string") {
+        errorMessage = error.detail;
+      } else if (Array.isArray(error.detail)) {
+        errorMessage = error.detail.map(d => d.msg || d.message || JSON.stringify(d)).join("; ");
+      } else if (error.message && typeof error.message === "string") {
+        errorMessage = error.message;
+      }
     } catch {
       // Ignore JSON parsing errors
     }
