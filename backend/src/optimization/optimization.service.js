@@ -278,58 +278,67 @@ export const optimizeJob = async (jobId, userId) => {
   // Call FastAPI
   // ------------------------
 
-  const result = await optimize(payload);
-  logger.info({ route: result.routes[0] }, "Python Backend Response received for optimization");
+  try {
+    const result = await optimize(payload);
+    logger.info({ route: result.routes[0] }, "Python Backend Response received for optimization");
 
+    // ------------------------
+    // Persist Routes in DB (Atomic Transaction)
+    // ------------------------
 
-  // ------------------------
-  // Persist Routes in DB (Atomic Transaction)
-  // ------------------------
+    await prisma.$transaction(async (tx) => {
+      // 1. Delete previous routes
+      await tx.route.deleteMany({
+        where: { jobId: jobId },
+      });
 
-  await prisma.$transaction(async (tx) => {
-    // 1. Delete previous routes
-    await tx.route.deleteMany({
-      where: { jobId: jobId },
+      // 2. Create new route records & RouteStops
+      for (const routeData of result.routes) {
+        const newRoute = await tx.route.create({
+          data: {
+            vehicleIndex: routeData.vehicle_id,
+            totalDistance: routeData.distance,
+            totalDuration: routeData.duration,
+            totalLoad: routeData.load,
+            jobId: jobId,
+          },
+        });
+
+        // Create RouteStop records
+        const stopsArray = routeData.stops || routeData.route.map(nodeIdx => ({ location_index: nodeIdx, distance_from_previous: null }));
+        const routeStopsData = stopsArray.map((stop, sequence) => {
+          const locationId = locations[stop.location_index].id;
+          return {
+            sequence: sequence,
+            routeId: newRoute.id,
+            locationId: locationId,
+            distanceFromPrevious: stop.distance_from_previous,
+            arrivalTime: null,
+          };
+        });
+
+        await tx.routeStop.createMany({
+          data: routeStopsData,
+        });
+      }
+
+      // 3. Update Job Status
+      await tx.optimizationJob.update({
+        where: { id: jobId },
+        data: { status: "COMPLETED" },
+      });
     });
 
-    // 2. Create new route records & RouteStops
-    for (const routeData of result.routes) {
-      const newRoute = await tx.route.create({
-        data: {
-          vehicleIndex: routeData.vehicle_id,
-          totalDistance: routeData.distance,
-          totalDuration: routeData.duration,
-          totalLoad: routeData.load,
-          jobId: jobId,
-        },
-      });
-
-      // Create RouteStop records
-      const stopsArray = routeData.stops || routeData.route.map(nodeIdx => ({ location_index: nodeIdx, distance_from_previous: null }));
-      const routeStopsData = stopsArray.map((stop, sequence) => {
-        const locationId = locations[stop.location_index].id;
-        return {
-          sequence: sequence,
-          routeId: newRoute.id,
-          locationId: locationId,
-          distanceFromPrevious: stop.distance_from_previous,
-          arrivalTime: null,
-        };
-      });
-
-      await tx.routeStop.createMany({
-        data: routeStopsData,
-      });
-    }
-
-    // 3. Update Job Status
-    await tx.optimizationJob.update({
+    return { success: true };
+  } catch (err) {
+    // Mark Job Status as FAILED in DB when optimization fails
+    await prisma.optimizationJob.update({
       where: { id: jobId },
-      data: { status: "COMPLETED" },
-    });
-  });
+      data: { status: "FAILED" },
+    }).catch(e => logger.error("Failed to update job status to FAILED", e));
 
-  return { success: true };
+    throw err;
+  }
 };
 
 export const getOptimizationResult = async (jobId, userId) => {
